@@ -12,8 +12,7 @@ import { RootStackParamList } from '../types';
 import { colors, categoryColors } from '../theme/colors';
 import { spacing, borderRadius } from '../theme/spacing';
 import { HINTS, HintCategory } from '../data/hints';
-import HintCard from '../components/HintCard';
-import Button from '../components/Button';
+import { Button, HintCard } from '../components';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -115,7 +114,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     color: colors.textSecondary,
-    lineHeight: 1.5,
+    lineHeight: 21,
   },
   categoryTabs: {
     flexDirection: 'row',

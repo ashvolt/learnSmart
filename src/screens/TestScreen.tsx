@@ -13,7 +13,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { Question, QuestionCategory, RootStackParamList, TestSession } from '../types';
 import { buildDailyTest, sampleQuestions } from '../data/questions';
-import { saveSesssion, formatTime } from '../utils/storage';
+import { saveSession, getSettings } from '../utils/storage';
+import { AnimatedOptionButton, OptionState, TimerDisplay } from '../components';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'DailyTest' | 'Practice'>;
@@ -32,23 +33,39 @@ const CAT_COLOR: Record<QuestionCategory, string> = {
 export default function TestScreen({ navigation, route }: Props) {
   const isDailyTest = route.name === 'DailyTest';
   const category = (route as RouteProp<RootStackParamList, 'Practice'>).params?.category;
+  const totalTime = isDailyTest ? FULL_TEST_TIME : PRACTICE_TIME;
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
-  const [timeLeft, setTimeLeft] = useState(isDailyTest ? FULL_TEST_TIME : PRACTICE_TIME);
+  const [timeLeft, setTimeLeft] = useState(totalTime);
   const [started, setStarted] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
-  const [startTime, setStartTime] = useState(0);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
 
+  // Mirrors of what finishTest needs. The countdown can fire it long after the
+  // render that started the test, so it must not read that render's closure.
+  const questionsRef = useRef<Question[]>([]);
+  const answersRef = useRef<(number | null)[]>([]);
+  const startTimeRef = useRef(0);
+  const finishedRef = useRef(false);
+
+  useEffect(() => {
+    getSettings().then((saved) => {
+      if (saved) setHapticsEnabled(saved.hapticsEnabled);
+    });
+  }, []);
+
   useEffect(() => {
     const qs = isDailyTest ? buildDailyTest() : sampleQuestions(20, category);
+    questionsRef.current = qs;
+    answersRef.current = new Array(qs.length).fill(null);
     setQuestions(qs);
-    setAnswers(new Array(qs.length).fill(null));
+    setAnswers(answersRef.current);
   }, [isDailyTest, category]);
 
   useEffect(() => {
@@ -61,62 +78,70 @@ export default function TestScreen({ navigation, route }: Props) {
     }
   }, [current, questions.length]);
 
+  // Writes the answer to the ref as well as state, so finishTest can run
+  // synchronously in the same handler that records the last answer.
+  const recordAnswer = useCallback((index: number, value: number | null) => {
+    const next = [...answersRef.current];
+    next[index] = value;
+    answersRef.current = next;
+    setAnswers(next);
+  }, []);
+
+  const finishTest = useCallback(() => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    const finalQuestions = questionsRef.current;
+    const finalAnswers = answersRef.current;
+    const elapsed = Math.round((Date.now() - startTimeRef.current) / 1000);
+
+    const breakdown: Record<QuestionCategory, { correct: number; total: number }> = {
+      verbal: { correct: 0, total: 0 },
+      math:   { correct: 0, total: 0 },
+      spatial:{ correct: 0, total: 0 },
+    };
+
+    let score = 0;
+    finalQuestions.forEach((q, i) => {
+      breakdown[q.category].total++;
+      if (finalAnswers[i] === q.correctIndex) {
+        score++;
+        breakdown[q.category].correct++;
+      }
+    });
+
+    const session: TestSession = {
+      date: new Date().toISOString(),
+      score,
+      total: finalQuestions.length,
+      timeTaken: elapsed,
+      categoryBreakdown: breakdown,
+    };
+
+    if (isDailyTest) saveSession(session);
+
+    navigation.replace('Results', { session });
+  }, [isDailyTest, navigation]);
+
   const startTest = useCallback(() => {
+    finishedRef.current = false;
+    startTimeRef.current = Date.now();
     setStarted(true);
-    setStartTime(Date.now());
     timerRef.current = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) {
-          clearInterval(timerRef.current!);
-          finishTest();
-          return 0;
-        }
-        return t - 1;
-      });
+      setTimeLeft((t) => (t > 0 ? t - 1 : 0));
     }, 1000);
   }, []);
 
+  // Time up. Kept out of the countdown updater so that stays side-effect free.
+  useEffect(() => {
+    if (started && timeLeft === 0) finishTest();
+  }, [started, timeLeft, finishTest]);
+
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
-
-  const finishTest = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setAnswers((ans) => {
-      const finalAnswers = ans;
-      const elapsed = Math.round((Date.now() - startTime) / 1000);
-
-      const breakdown: Record<QuestionCategory, { correct: number; total: number }> = {
-        verbal: { correct: 0, total: 0 },
-        math:   { correct: 0, total: 0 },
-        spatial:{ correct: 0, total: 0 },
-      };
-
-      let score = 0;
-      questions.forEach((q, i) => {
-        breakdown[q.category].total++;
-        if (finalAnswers[i] === q.correctIndex) {
-          score++;
-          breakdown[q.category].correct++;
-        }
-      });
-
-      const session: TestSession = {
-        date: new Date().toISOString(),
-        score,
-        total: questions.length,
-        timeTaken: elapsed,
-        categoryBreakdown: breakdown,
-      };
-
-      if (isDailyTest) saveSesssion(session);
-
-      // Navigate to results
-      setTimeout(() => {
-        navigation.replace('Results', { session });
-      }, 100);
-
-      return finalAnswers;
-    });
-  }, [questions, startTime, isDailyTest, navigation]);
 
   const handleSelect = (idx: number) => {
     if (showAnswer) return;
@@ -124,9 +149,7 @@ export default function TestScreen({ navigation, route }: Props) {
     if (!isDailyTest) {
       // Practice mode: show answer immediately
       setShowAnswer(true);
-      const newAnswers = [...answers];
-      newAnswers[current] = idx;
-      setAnswers(newAnswers);
+      recordAnswer(current, idx);
     }
   };
 
@@ -134,9 +157,7 @@ export default function TestScreen({ navigation, route }: Props) {
     if (selected === null && !showAnswer) return;
     // In full test mode, record answer on Next
     if (isDailyTest && selected !== null) {
-      const newAnswers = [...answers];
-      newAnswers[current] = selected;
-      setAnswers(newAnswers);
+      recordAnswer(current, selected);
     }
     setSelected(null);
     setShowAnswer(false);
@@ -150,9 +171,7 @@ export default function TestScreen({ navigation, route }: Props) {
 
   const handleSkip = () => {
     if (isDailyTest) {
-      const newAnswers = [...answers];
-      newAnswers[current] = null;
-      setAnswers(newAnswers);
+      recordAnswer(current, null);
     }
     setSelected(null);
     setShowAnswer(false);
@@ -166,7 +185,7 @@ export default function TestScreen({ navigation, route }: Props) {
   const confirmQuit = () => {
     Alert.alert('Quit Test', 'Are you sure you want to quit?', [
       { text: 'Continue', style: 'cancel' },
-      { text: 'Quit', style: 'destructive', onPress: () => { clearInterval(timerRef.current!); navigation.goBack(); } },
+      { text: 'Quit', style: 'destructive', onPress: () => { if (timerRef.current) clearInterval(timerRef.current); navigation.goBack(); } },
     ]);
   };
 
@@ -203,8 +222,18 @@ export default function TestScreen({ navigation, route }: Props) {
 
   const q = questions[current];
   const catColor = CAT_COLOR[q.category];
-  const timeWarning = timeLeft < 120;
   const answeredCount = answers.filter((a) => a !== null).length;
+
+  // In the full test the answer is only revealed at the end, so an option is
+  // never marked correct or wrong mid-test.
+  const optionState = (idx: number): OptionState => {
+    if (showAnswer) {
+      if (idx === q.correctIndex) return 'correct';
+      if (idx === selected) return 'wrong';
+      return 'default';
+    }
+    return idx === selected ? 'selected' : 'default';
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -214,9 +243,12 @@ export default function TestScreen({ navigation, route }: Props) {
           <Text style={styles.quit}>✕</Text>
         </TouchableOpacity>
         <View style={styles.timerWrap}>
-          <Text style={[styles.timer, timeWarning && styles.timerWarn]}>
-            {formatTime(timeLeft)}
-          </Text>
+          <TimerDisplay
+            seconds={timeLeft}
+            totalSeconds={totalTime}
+            isActive={started}
+            size={78}
+          />
         </View>
         <Text style={styles.counter}>{current + 1}/{questions.length}</Text>
       </View>
@@ -249,37 +281,17 @@ export default function TestScreen({ navigation, route }: Props) {
         <Text style={styles.questionText}>{q.text}</Text>
 
         {/* Options */}
-        {q.options.map((opt, idx) => {
-          let optStyle = styles.optionCard;
-          let optTextStyle = styles.optionText;
-
-          if (showAnswer) {
-            if (idx === q.correctIndex) {
-              optStyle = { ...styles.optionCard, ...styles.optCorrect };
-              optTextStyle = { ...styles.optionText, color: '#2ECC71' };
-            } else if (idx === selected && selected !== q.correctIndex) {
-              optStyle = { ...styles.optionCard, ...styles.optWrong };
-              optTextStyle = { ...styles.optionText, color: '#E74C3C' };
-            }
-          } else if (idx === selected) {
-            optStyle = { ...styles.optionCard, ...styles.optSelected };
-            optTextStyle = { ...styles.optionText, color: '#4A90D9' };
-          }
-
-          return (
-            <TouchableOpacity
-              key={idx}
-              style={optStyle}
-              onPress={() => handleSelect(idx)}
-              activeOpacity={showAnswer ? 1 : 0.7}
-            >
-              <View style={styles.optLetter}>
-                <Text style={styles.optLetterText}>{String.fromCharCode(65 + idx)}</Text>
-              </View>
-              <Text style={optTextStyle}>{opt}</Text>
-            </TouchableOpacity>
-          );
-        })}
+        {q.options.map((opt, idx) => (
+          <AnimatedOptionButton
+            key={idx}
+            text={opt}
+            index={idx}
+            onPress={handleSelect}
+            state={optionState(idx)}
+            showFeedback={showAnswer}
+            hapticsEnabled={hapticsEnabled}
+          />
+        ))}
 
         {/* Explanation (practice mode) */}
         {showAnswer && q.explanation && (
@@ -336,8 +348,6 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   quit: { fontSize: 20, color: '#8899AA', padding: 4 },
   timerWrap: { flex: 1, alignItems: 'center' },
-  timer: { fontSize: 22, fontWeight: '700', color: '#FFFFFF', fontVariant: ['tabular-nums'] },
-  timerWarn: { color: '#E74C3C' },
   counter: { fontSize: 14, color: '#8899AA', fontWeight: '600' },
 
   progressBg: { height: 4, backgroundColor: '#1C2B3A' },
@@ -354,31 +364,6 @@ const styles = StyleSheet.create({
   },
   catBadgeText: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   questionText: { fontSize: 17, color: '#FFFFFF', lineHeight: 26, marginBottom: 24, fontWeight: '500' },
-
-  optionCard: {
-    backgroundColor: '#1C2B3A',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  optSelected: { borderColor: '#4A90D9', backgroundColor: '#1A2E45' },
-  optCorrect: { borderColor: '#2ECC71', backgroundColor: '#0D2E1A' },
-  optWrong: { borderColor: '#E74C3C', backgroundColor: '#2E0D0D' },
-  optLetter: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#0F1923',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  optLetterText: { fontSize: 13, fontWeight: '700', color: '#8899AA' },
-  optionText: { fontSize: 15, color: '#CCDDEE', flex: 1, lineHeight: 21 },
 
   explanationBox: {
     backgroundColor: '#1C2B3A',

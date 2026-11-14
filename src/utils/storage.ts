@@ -5,7 +5,7 @@ const SESSIONS_KEY = 'ccat_sessions';
 const STREAK_KEY = 'ccat_streak';
 const SETTINGS_KEY = 'ccat_settings';
 
-export async function saveSesssion(session: TestSession): Promise<void> {
+export async function saveSession(session: TestSession): Promise<void> {
   const existing = await getSessions();
   const updated = [session, ...existing].slice(0, 60); // keep last 60
   await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(updated));

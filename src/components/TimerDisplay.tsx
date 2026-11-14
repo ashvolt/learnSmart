@@ -4,32 +4,34 @@ import {
   Text,
   StyleSheet,
   Animated,
+  StyleProp,
   ViewStyle,
 } from 'react-native';
 import { colors } from '../theme/colors';
-import { spacing } from '../theme/spacing';
 
 interface TimerProps {
   seconds: number;
   totalSeconds: number;
   isActive: boolean;
-  onTimeUp?: () => void;
-  style?: ViewStyle;
+  /** Diameter of the ring. The label only fits from roughly 110 up. */
+  size?: number;
+  style?: StyleProp<ViewStyle>;
 }
 
 export default function TimerDisplay({
   seconds,
   totalSeconds,
   isActive,
-  onTimeUp,
+  size = 140,
   style,
 }: TimerProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const percentage = (seconds / totalSeconds) * 100;
-  const isUrgent = seconds <= 60; // Red when less than 1 minute
-  const isCritical = seconds <= 30; // Extra urgent when less than 30 seconds
+  const percentage = totalSeconds > 0 ? (seconds / totalSeconds) * 100 : 0;
+  const isUrgent = seconds <= 60; // Amber under a minute
+  const isCritical = seconds <= 30; // Red and pulsing under thirty seconds
+  const showLabel = size >= 110;
 
   // Pulse animation when critical
   useEffect(() => {
@@ -83,6 +85,8 @@ export default function TimerDisplay({
     return `${m}:${s}`;
   };
 
+  const fontSize = Math.round(size * 0.3);
+
   return (
     <Animated.View
       style={[
@@ -94,7 +98,18 @@ export default function TimerDisplay({
       ]}
     >
       {/* Outer ring with progress indicator */}
-      <View style={[styles.progressRing, { borderColor: getTimerColor() }]}>
+      <View
+        style={[
+          styles.progressRing,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            borderWidth: size >= 110 ? 3 : 2,
+            borderColor: getTimerColor(),
+          },
+        ]}
+      >
         {/* Progress bar arc (simplified with border) */}
         <View
           style={[
@@ -113,12 +128,14 @@ export default function TimerDisplay({
               styles.timerText,
               {
                 color: getTimerColor(),
+                fontSize,
+                lineHeight: Math.round(fontSize * 1.15),
               },
             ]}
           >
             {formatTime(seconds)}
           </Text>
-          {isUrgent && (
+          {showLabel && isUrgent && (
             <Text style={[styles.urgentLabel, { color: getTimerColor() }]}>
               {isCritical ? '⚠ Hurry!' : 'Last minute'}
             </Text>
@@ -135,10 +152,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   progressRing: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.card,
@@ -158,10 +171,9 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   timerText: {
-    fontSize: 48,
     fontWeight: '700',
-    lineHeight: 56,
     letterSpacing: -1,
+    fontVariant: ['tabular-nums'],
   },
   urgentLabel: {
     fontSize: 11,

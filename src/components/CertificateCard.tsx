@@ -1,27 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  Share,
+  StyleProp,
   ViewStyle,
 } from 'react-native';
-import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
 import { colors } from '../theme/colors';
-import { spacing, borderRadius } from '../theme/spacing';
+import { spacing } from '../theme/spacing';
 import Card from './Card';
 import Button from './Button';
 import {
   Certificate,
   formatCertificateText,
   getCertificateAchievementBadge,
+  shareToLinkedIn,
 } from '../utils/certificate';
 
 interface CertificateCardProps {
   certificate: Certificate;
   onShare?: () => void;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 export default function CertificateCard({
@@ -37,23 +37,21 @@ export default function CertificateCard({
     year: 'numeric',
   });
 
+  const [copied, setCopied] = useState(false);
+
   const handleShare = async () => {
     try {
-      const message = formatCertificateText(certificate);
-
-      // Try native share first
-      await Share.share({
-        message,
-        title: 'My CCAT Achievement',
-        url: undefined,
-      });
-
-      if (onShare) {
-        onShare();
-      }
+      await shareToLinkedIn(certificate);
+      onShare?.();
     } catch (error) {
       console.error('Error sharing:', error);
     }
+  };
+
+  const handleCopy = async () => {
+    await Clipboard.setStringAsync(formatCertificateText(certificate));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -96,19 +94,15 @@ export default function CertificateCard({
       {/* Share Buttons */}
       <View style={styles.actions}>
         <Button
-          label="📋 Copy Certificate"
-          onPress={() => {
-            // Copy to clipboard functionality
-            const text = formatCertificateText(certificate);
-            // In real app, use react-native-clipboard
-          }}
+          label={copied ? '✓ Copied' : '📋 Copy Certificate'}
+          onPress={handleCopy}
           variant="secondary"
           size="sm"
           style={styles.button}
         />
 
         <Button
-          label="🔗 Share to LinkedIn"
+          label="🔗 Share Achievement"
           onPress={handleShare}
           variant="primary"
           size="sm"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { colors, categoryColors } from '../theme/colors';
 import { spacing, borderRadius } from '../theme/spacing';
 import { Hint } from '../data/hints';
@@ -7,7 +7,7 @@ import Card from './Card';
 
 interface HintCardProps {
   hint: Hint;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 const categoryIcons: Record<string, string> = {
@@ -82,19 +82,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
-    lineHeight: 1.3,
+    lineHeight: 23,
   },
   content: {
     fontSize: 14,
     fontWeight: '400',
     color: colors.textSecondary,
-    lineHeight: 1.6,
+    lineHeight: 22,
     marginBottom: spacing.lg,
   },
   tipsContainer: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingTopVertical: spacing.lg,
     paddingTop: spacing.lg,
   },
   tipsLabel: {
@@ -120,6 +119,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: colors.textSecondary,
     flex: 1,
-    lineHeight: 1.5,
+    lineHeight: 20,
   },
 });

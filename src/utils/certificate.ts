@@ -1,4 +1,4 @@
-import * as Sharing from 'expo-sharing';
+import { Share } from 'react-native';
 import { TestSession } from '../types';
 
 export interface Certificate {
@@ -49,17 +49,15 @@ export function formatCertificateText(cert: Certificate): string {
 }
 
 export async function shareToLinkedIn(certificate: Certificate): Promise<void> {
-  const text = formatCertificateText(certificate);
+  const message = formatCertificateText(certificate);
 
   try {
-    const result = await Sharing.shareAsync(undefined, {
-      mimeType: 'text/plain',
-      dialogTitle: 'Share CCAT Achievement',
-      UTI: 'public.plain-text',
-    });
+    const result = await Share.share(
+      { message, title: 'My CCAT Achievement' },
+      { dialogTitle: 'Share CCAT Achievement' }
+    );
 
-    // Check if user shared
-    if (result.action === Sharing.SharedAction.SHARED) {
+    if (result.action === Share.sharedAction) {
       console.log('Certificate shared successfully');
     }
   } catch (error) {

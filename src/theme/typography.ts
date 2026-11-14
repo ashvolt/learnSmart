@@ -28,7 +28,8 @@ export const typography = {
     700: '700',  // Bold
   },
 
-  // Line heights
+  // Line height multipliers. React Native's `lineHeight` style is an absolute
+  // pixel value, so multiply these by a fontSize before using them in a style.
   lineHeight: {
     tight: 1.2,
     normal: 1.5,
@@ -41,19 +42,19 @@ export const typography = {
     h1: {
       fontSize: 32,
       fontWeight: '700',
-      lineHeight: 1.2,
+      lineHeight: 38,
       color: '#FFFFFF',
     },
     h2: {
       fontSize: 28,
       fontWeight: '700',
-      lineHeight: 1.2,
+      lineHeight: 34,
       color: '#FFFFFF',
     },
     h3: {
       fontSize: 24,
       fontWeight: '600',
-      lineHeight: 1.3,
+      lineHeight: 31,
       color: '#FFFFFF',
     },
 
@@ -61,19 +62,19 @@ export const typography = {
     body: {
       fontSize: 16,
       fontWeight: '400',
-      lineHeight: 1.5,
+      lineHeight: 24,
       color: '#CCDDEE',
     },
     bodyBold: {
       fontSize: 16,
       fontWeight: '600',
-      lineHeight: 1.5,
+      lineHeight: 24,
       color: '#CCDDEE',
     },
     bodySm: {
       fontSize: 14,
       fontWeight: '400',
-      lineHeight: 1.5,
+      lineHeight: 21,
       color: '#CCDDEE',
     },
 
@@ -81,13 +82,13 @@ export const typography = {
     caption: {
       fontSize: 12,
       fontWeight: '400',
-      lineHeight: 1.4,
+      lineHeight: 17,
       color: '#8899AA',
     },
     captionBold: {
       fontSize: 12,
       fontWeight: '600',
-      lineHeight: 1.4,
+      lineHeight: 17,
       color: '#8899AA',
     },
 
@@ -95,13 +96,13 @@ export const typography = {
     button: {
       fontSize: 16,
       fontWeight: '600',
-      lineHeight: 1.4,
+      lineHeight: 22,
       color: '#FFFFFF',
     },
     buttonSm: {
       fontSize: 14,
       fontWeight: '600',
-      lineHeight: 1.4,
+      lineHeight: 20,
       color: '#FFFFFF',
     },
 
@@ -109,7 +110,7 @@ export const typography = {
     number: {
       fontSize: 32,
       fontWeight: '700',
-      lineHeight: 1.2,
+      lineHeight: 38,
       color: '#4A90D9',
     },
   },

@@ -11,6 +11,11 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList, QuestionCategory } from '../types';
 import { formatTime, scoreLabel } from '../utils/storage';
+import { generateCertificate } from '../utils/certificate';
+import { CertificateCard, ConfettiCelebration } from '../components';
+
+// Crossover's target is 30/50, so 60% is where a result is worth celebrating.
+const CERTIFICATE_THRESHOLD = 60;
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Results'>;
@@ -35,6 +40,7 @@ export default function ResultsScreen({ navigation, route }: Props) {
   const pct = Math.round((session.score / session.total) * 100);
   const label = scoreLabel(session.score, session.total);
   const color = scoreColor(pct);
+  const earnedCertificate = pct >= CERTIFICATE_THRESHOLD;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -105,6 +111,13 @@ export default function ResultsScreen({ navigation, route }: Props) {
           <Text style={styles.adviceText}>{getAdvice(session)}</Text>
         </View>
 
+        {/* Certificate, once the benchmark is met */}
+        {earnedCertificate && (
+          <View style={styles.certificateWrap}>
+            <CertificateCard certificate={generateCertificate(session)} />
+          </View>
+        )}
+
         {/* Actions */}
         <TouchableOpacity
           style={styles.primaryBtn}
@@ -119,6 +132,9 @@ export default function ResultsScreen({ navigation, route }: Props) {
           <Text style={styles.secondaryBtnText}>← Back to Home</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Overlay, so it must come after the ScrollView to sit on top */}
+      <ConfettiCelebration trigger={earnedCertificate} />
     </SafeAreaView>
   );
 }
@@ -207,6 +223,8 @@ const styles = StyleSheet.create({
   },
   adviceTitle: { fontSize: 13, fontWeight: '700', color: '#4A90D9', marginBottom: 4 },
   adviceText: { fontSize: 13, color: '#CCDDEE', lineHeight: 19 },
+
+  certificateWrap: { marginBottom: 24 },
 
   primaryBtn: {
     backgroundColor: '#4A90D9',

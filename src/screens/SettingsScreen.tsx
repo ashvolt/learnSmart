@@ -13,8 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { RootStackParamList } from '../types';
 import { colors } from '../theme/colors';
 import { spacing, borderRadius } from '../theme/spacing';
-import Card from '../components/Card';
-import Button from '../components/Button';
+import { Button, Card } from '../components';
 import { getSettings, updateSettings } from '../utils/storage';
 
 type Props = {
@@ -41,7 +40,9 @@ export default function SettingsScreen({ navigation }: Props) {
     }
   }, []);
 
-  useFocusEffect(load);
+  // useFocusEffect's callback may only return a cleanup function, so the async
+  // load is fired from inside a sync wrapper rather than passed directly.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const handleToggle = async (key: keyof AppSettings) => {
     const newSettings = {
@@ -216,7 +217,7 @@ const styles = StyleSheet.create({
   settingDescription: {
     fontSize: 12,
     color: colors.textMuted,
-    lineHeight: 1.4,
+    lineHeight: 17,
   },
   infoRow: {
     flexDirection: 'row',
